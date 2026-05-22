@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Volumetric Shipping Calculator</title>
+  <style>
+    :root {
+      --bg-color: #f8fafc;
+      --card-bg: #ffffff;
+      --text-main: #1e293b;
+      --text-muted: #64748b;
+      --accent: #2563eb;
+      --accent-hover: #1d4ed8;
+      --border: #e2e8f0;
+      --success-bg: #f0fdf4;
+      --success-text: #166534;
+      --error-bg: #fef2f2;
+      --error-text: #991b1b;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    }
+
+    body {
+      background-color: var(--bg-color);
+      color: var(--text-main);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      padding: 20px;
+    }
+
+    .calculator-card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+      width: 100%;
+      max-width: 480px;
+      padding: 32px;
+    }
+
+    h2 {
+      font-size: 24px;
+      font-weight: 600;
+      margin-bottom: 8px;
+      color: var(--text-main);
+    }
+
+    p.subtitle {
+      font-size: 14px;
+      color: var(--text-muted);
+      margin-bottom: 24px;
+    }
+
+    .form-group {
+      margin-bottom: 20px;
+    }
+
+    label {
+      display: block;
+      font-size: 14px;
+      font-weight: 500;
+      margin-bottom: 6px;
+      color: var(--text-main);
+    }
+
+    input[type="text"], input[type="number"] {
+      width: 100%;
+      padding: 10px 14px;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      font-size: 15px;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    input:focus {
+      border-color: var(--accent);
+    }
+
+    button {
+      width: 100%;
+      padding: 12px;
+      background-color: var(--accent);
+      color: white;
+      border: none;
+      border-radius: 6px;
+      font-size: 16px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: background-color 0.2s;
+      margin-top: 10px;
+    }
+
+    button:hover {
+      background-color: var(--accent-hover);
+    }
+
+    button:disabled {
+      background-color: var(--border);
+      color: var(--text-muted);
+      cursor: not-allowed;
+    }
+
+    .result-box {
+      margin-top: 24px;
+      padding: 16px;
+      border-radius: 8px;
+      display: none;
+      font-size: 15px;
+    }
+
+    .result-box.success {
+      display: block;
+      background-color: var(--success-bg);
+      color: var(--success-text);
+      border: 1px solid #bbf7d0;
+    }
+
+    .result-box.error {
+      display: block;
+      background-color: var(--error-bg);
+      color: var(--error-text);
+      border: 1px solid #fca5a5;
+    }
+
+    .result-box .price {
+      font-size: 24px;
+      font-weight: 700;
+      margin-top: 4px;
+    }
+
+    .status-msg {
+      font-size: 12px;
+      color: var(--text-muted);
+      text-align: center;
+      margin-top: 16px;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="calculator-card">
+    <h2>Shipping Calculator</h2>
+    <p class="subtitle">Calculate volumetric freight delivery costs dynamically</p>
+    
+    <div class="form-group">
+      <label for="postcode">Destination Postcode</label>
+      <input type="text" id="postcode" placeholder="e.g. 600 or 7385">
+    </div>
+
+    <div class="form-group">
+      <label for="volume">Total Volume (m³)</label>
+      <input type="number" id="volume" step="0.001" min="0" placeholder="e.g. 0.75">
+    </div>
+
+    <button id="calcBtn" disabled>Loading Sheet Data...</button>
+
+    <div id="result" class="result-box"></div>
+    <div id="status" class="status-msg">Connecting to data matrix...</div>
+  </div>
+
+  <script>
+    // REPLACE THIS WITH YOUR DEPLOYED GOOGLE APPS SCRIPT WEB APP URL
+    const API_URL = "https://script.google.com/macros/s/AKfycbzCax2j2MPl6A_KspVeCJ-w8qTNBkdYZ5ISJnZH5yvpn7M-ZLTOAC1U4eELduxhkochDg/exec";
+
+    let sheetData = null;
+
+    // Fetch matrix data on load
+    async function initData() {
+      try {
+        const response = await fetch(API_URL);
+        if (!response.ok) throw new Error("Failed to load matrix data.");
+        sheetData = await response.json();
+        
+        document.getElementById("calcBtn").innerText = "Calculate Shipping";
+        document.getElementById("calcBtn").disabled = false;
+        document.getElementById("status").innerText = "Rates synchronized via Google Sheets";
+      } catch (err) {
+        document.getElementById("status").innerText = "Error syncing data template. Check App Script configuration.";
+        console.error(err);
+      }
+    }
+
+    function calculateShipping() {
+      const postcodeVal = document.getElementById("postcode").value.trim();
+      const volumeVal = parseFloat(document.getElementById("volume").value);
+      const resultBox = document.getElementById("result");
+
+      resultBox.className = "result-box"; // reset state
+      resultBox.innerHTML = "";
+
+      if (!postcodeVal || isNaN(volumeVal)) {
+        resultBox.classList.add("error");
+        resultBox.innerText = "Please provide both a valid postcode and volume.";
+        return;
+      }
+
+      // 1. Match Postcode
+      const zoneMapping = sheetData.postcodes.find(p => p.postcode === postcodeVal);
+      if (!zoneMapping) {
+        resultBox.classList.add("error");
+        resultBox.innerText = `Postcode "${postcodeVal}" not found in current delivery range.`;
+        return;
+      }
+
+      const originatingHub = zoneMapping.warehouse; // 'AKL' or 'CHC'
+      const destinationZone = zoneMapping.zone;     // e.g. 'AKL-Metro' or 'Chch-Zone 2'
+
+      // Helper values to bypass string format variations in the sheet
+      const originHubNormalized = originatingHub === "AKL" ? "From AKL" : "CHCH";
+
+      // 2. Query matching Rate bracket
+      const matchedRate = sheetData.rates.find(rate => {
+        // Match base hub
+        if (rate.warehouse !== originHubNormalized) return false;
+
+        // Clean strings to check zone convergence (matches "AKL To AKL-Metro" with "AKL-Metro")
+        const rateZoneClean = rate.zone.toLowerCase().replace(/^(from\s+|from|akl\s+to\s+|chch\s+to\s+|kl\s+to\s+)/g, "").trim();
+        const destZoneClean = destinationZone.toLowerCase().trim();
+        
+        if (rateZoneClean !== destZoneClean) return false;
+
+        // Volumetric filter
+        return volumeVal >= rate.minVol && volumeVal <= rate.maxVol;
+      });
+
+      // 3. Render Output
+      if (!matchedRate) {
+        resultBox.classList.add("error");
+        resultBox.innerText = `No shipping rate defined for Zone: ${destinationZone} at ${volumeVal} m³.`;
+      } else if (matchedRate.cost === null) {
+        resultBox.classList.add("error");
+        resultBox.innerText = `Rate entry exists for ${destinationZone} but price is currently unconfigured in the sheet.`;
+      } else {
+        resultBox.classList.add("success");
+        resultBox.innerHTML = `
+          <div><strong>Fulfillment:</strong> ${originatingHub} Hub &rarr; ${destinationZone}</div>
+          <div><strong>Estimated Cost:</strong></div>
+          <div class="price">NZ$${matchedRate.cost.toFixed(2)}</div>
+        `;
+      }
+    }
+
+    document.getElementById("calcBtn").addEventListener("click", calculateShipping);
+    window.addEventListener("DOMContentLoaded", initData);
+  </script>
+</body>
+</html>
