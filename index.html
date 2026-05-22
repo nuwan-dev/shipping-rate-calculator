@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -71,7 +72,8 @@
       color: var(--text-main);
     }
 
-    input[type="text"], input[type="number"] {
+    input[type="text"],
+    input[type="number"] {
       width: 100%;
       padding: 10px 14px;
       border: 1px solid var(--border);
@@ -145,12 +147,13 @@
     }
   </style>
 </head>
+
 <body>
 
   <div class="calculator-card">
     <h2>Shipping Calculator</h2>
     <p class="subtitle">Calculate volumetric freight delivery costs dynamically</p>
-    
+
     <div class="form-group">
       <label for="postcode">Destination Postcode</label>
       <input type="text" id="postcode" placeholder="e.g. 600 or 7385">
@@ -179,7 +182,7 @@
         const response = await fetch(API_URL);
         if (!response.ok) throw new Error("Failed to load matrix data.");
         sheetData = await response.json();
-        
+
         document.getElementById("calcBtn").innerText = "Calculate Shipping";
         document.getElementById("calcBtn").disabled = false;
         document.getElementById("status").innerText = "Rates synchronized via Google Sheets";
@@ -203,8 +206,16 @@
         return;
       }
 
-      // 1. Match Postcode
-      const zoneMapping = sheetData.postcodes.find(p => p.postcode === postcodeVal);
+      // --- NEW UPDATE: Normalize the user input to strip any leading zeros for the lookup ---
+      // This turns "0600" into "600", while keeping "1010" as "1010"
+      const normalizedInputPostcode = postcodeVal.replace(/^0+/, "");
+
+      // 1. Match Postcode (Comparing stripped user input with stripped sheet data)
+      const zoneMapping = sheetData.postcodes.find(p => {
+        const sheetPostcodeNormalized = p.postcode.replace(/^0+/, "");
+        return sheetPostcodeNormalized === normalizedInputPostcode;
+      });
+
       if (!zoneMapping) {
         resultBox.classList.add("error");
         resultBox.innerText = `Postcode "${postcodeVal}" not found in current delivery range.`;
@@ -225,7 +236,7 @@
         // Clean strings to check zone convergence (matches "AKL To AKL-Metro" with "AKL-Metro")
         const rateZoneClean = rate.zone.toLowerCase().replace(/^(from\s+|from|akl\s+to\s+|chch\s+to\s+|kl\s+to\s+)/g, "").trim();
         const destZoneClean = destinationZone.toLowerCase().trim();
-        
+
         if (rateZoneClean !== destZoneClean) return false;
 
         // Volumetric filter
@@ -242,10 +253,10 @@
       } else {
         resultBox.classList.add("success");
         resultBox.innerHTML = `
-          <div><strong>Fulfillment:</strong> ${originatingHub} Hub &rarr; ${destinationZone}</div>
-          <div><strong>Estimated Cost:</strong></div>
-          <div class="price">NZ$${matchedRate.cost.toFixed(2)}</div>
-        `;
+      <div><strong>Fulfillment:</strong> ${originatingHub} Hub &rarr; ${destinationZone}</div>
+      <div><strong>Estimated Cost:</strong></div>
+      <div class="price">NZ$${matchedRate.cost.toFixed(2)}</div>
+    `;
       }
     }
 
@@ -253,4 +264,5 @@
     window.addEventListener("DOMContentLoaded", initData);
   </script>
 </body>
+
 </html>
